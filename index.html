@@ -1,0 +1,37 @@
+﻿<!DOCTYPE html>
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head runat="server">
+    <title></title>
+    <link rel="stylesheet" href="Styles/common.css" />
+    <style type="text/css">
+        .header {
+            font-size: 60pt;
+            text-align: center;
+        }
+        .sub-header {
+            font-family: Arial, Helvetica, sans-serif;
+            font-size: 18pt;
+            text-align: center;
+            color: #000000;
+            margin: 0 0 10px;
+        }
+        .footer {
+            text-align: center;
+        }
+    </style>
+</head>
+<body>
+    <h1 class="header">AskMe</h1>
+    <p class="sub-header"><em>Go ahead, AskMe anything!</em></p>
+    <form id="query" action="/Search.aspx" method="get">
+        <center>
+            <input class="searchBar" type="text" placeholder="Enter what you wish to know." name="q" />
+            <input class="submitBox" type="submit" value="Search!" />
+        </center>
+    </form>
+    <div class="footer">
+        <p>Copyright (C) 2025 Logan C. GPLv3 or later.<br /><a href="/NewPage.aspx">Click here to help make me smarter by submitting a page!</a></p>
+    </div>
+</body>
+</html>

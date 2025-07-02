@@ -1,0 +1,21 @@
+﻿body {
+    font-family: Arial;
+    font-size: 18px;
+    margin: 0 5px;
+}
+.header {
+    font-family: Arial;
+    font-size: 40pt;
+    text-align: left;
+    color: #000000;
+    margin: 0;
+}
+.searchBar {
+    width: 30%;
+}
+.submitBox {
+    margin: 0 0 0 5px;
+}
+.footer {
+    font-size: 12px;
+}

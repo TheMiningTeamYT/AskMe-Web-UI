@@ -1,0 +1,18 @@
+﻿<%@ Master Language="C#" AutoEventWireup="true" CodeBehind="AskMe.Master.cs" Inherits="AskMe_Web_UI.MasterPages.Site1" %>
+
+<!DOCTYPE html>
+
+<html>
+<head runat="server">
+    <link rel="stylesheet" href="../Styles/common.css" />
+    <asp:ContentPlaceHolder ID="head" runat="server">
+    </asp:ContentPlaceHolder>
+</head>
+<body>
+    <a href="/" style="text-decoration: none;"><h1 class="header">AskMe</h1></a>
+    <asp:ContentPlaceHolder ID="body" runat="server"></asp:ContentPlaceHolder>
+    <div class="footer">
+        <p>Copyright (C) 2025 Logan C. GPLv3 or later.<br /><a href="/NewPage.aspx">Click here to help make me smarter by submitting a page!</a></p>
+    </div>
+</body>
+</html>
