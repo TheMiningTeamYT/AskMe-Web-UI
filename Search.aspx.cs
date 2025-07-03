@@ -55,7 +55,7 @@ namespace AskMe_Web_UI {
 
                 // Get all the pages matching the query.
                 // pageID, score
-                Dictionary<Int64, int> pageScores = new Dictionary<Int64, int>();
+                Dictionary<Int64, PageScore> pageScores = new Dictionary<Int64, PageScore>();
                 DataSet matchingPages;
                 SqlDataAdapter adapter;
                 try {
@@ -71,25 +71,32 @@ namespace AskMe_Web_UI {
                             Int64 pageID = (Int64)row["pageID"];
                             HashSet<string> neighbors = JsonConvert.DeserializeObject<HashSet<string>>((string)row["neighbors"]);
                             if (!pageScores.ContainsKey(pageID)) {
-                                pageScores[pageID] = 0;
+                                pageScores[pageID] = new PageScore {
+                                    matches = 0,
+                                    score = 0
+                                };
                             }
+                            pageScores[pageID].matches += 1;
                             if (words.Length == 1) {
-                                pageScores[pageID] += 1;
+                                pageScores[pageID].score += 1;
                             } else {
-                                pageScores[pageID] += words.Length - 1;
+                                pageScores[pageID].score += words.Length - 1;
                                 for (int j = 0; j < words.Length; j++) {
                                     if (j != i && neighbors.Contains(words[j])) {
                                         int distance = Math.Abs(i - j);
                                         if (distance == 1) {
-                                            pageScores[pageID] += words.Length;
+                                            pageScores[pageID].score += words.Length;
                                         } else {
-                                            pageScores[pageID] += words.Length - distance;
+                                            pageScores[pageID].score += words.Length - distance;
                                         }
                                     }
                                 }
                             }
                         }
                     }
+
+                    // Filter the page score dictionary for pages with at least (words.length / 2) matches
+                    pageScores = pageScores.Where(i => i.Value.matches > (words.Length / 2)).ToDictionary(i => i.Key, i => i.Value);
 
                     // If we didn't find any results, return.
                     if (pageScores.Keys.Count == 0) {
@@ -115,7 +122,7 @@ namespace AskMe_Web_UI {
                 try {
                     foreach (DataRow row in matchingPages.Tables[0].Rows) {
                         Int64 pageID = (Int64)row["ID"];
-                        resultList.Add(new PageEntry { url = (string)row["url"], title = (string)row["title"], contents = (HttpUtility.HtmlDecode((string)row["contents"])).Replace('\r', ' ').Replace('\n', ' '), popularity = ((int)row["clicks"] / float.Parse(WebConfigurationManager.AppSettings["clickWeight"]) + 1.0f) * pageScores[pageID] });
+                        resultList.Add(new PageEntry { url = (string)row["url"], title = (string)row["title"], contents = (HttpUtility.HtmlDecode((string)row["contents"])).Replace('\r', ' ').Replace('\n', ' '), popularity = ((int)row["clicks"] / float.Parse(WebConfigurationManager.AppSettings["clickWeight"]) + 1.0f) * pageScores[pageID].score });
                     }
                     resultList.Sort();
                     // I think this is safe?
@@ -211,6 +218,10 @@ namespace AskMe_Web_UI {
         public static string to_sql_list(ICollection<Int64> l) {
             return $"({String.Join(" , ", l.Select(i => i.ToString()).ToArray())})";
         }
+    }
+    public class PageScore {
+        public int matches;
+        public int score;
     }
     public class PageEntry : IComparable<PageEntry> {
         public string url;
