@@ -96,7 +96,7 @@ namespace AskMe_Web_UI {
                     }
 
                     // Filter the page score dictionary for pages with at least (words.length / 2) matches
-                    pageScores = pageScores.Where(i => i.Value.matches > (words.Length / 2)).ToDictionary(i => i.Key, i => i.Value);
+                    pageScores = pageScores.Where(i => i.Value.matches >= (words.Length / 2)).ToDictionary(i => i.Key, i => i.Value);
 
                     // If we didn't find any results, return.
                     if (pageScores.Keys.Count == 0) {
