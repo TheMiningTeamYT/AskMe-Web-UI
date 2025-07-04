@@ -39,6 +39,7 @@ namespace AskMe_Web_UI {
             }
 
             Regex previewFinder;
+            Regex previewBolder;
 
             if (Session["page"] == null || !IsPostBack) {
                 // Connect to the DB.
@@ -126,13 +127,15 @@ namespace AskMe_Web_UI {
                     }
                     resultList.Sort();
                     // I think this is safe?
-                    previewFinder = new Regex($"\\b\\w(?=.{{0,200}}\\b({String.Join("|", words)})\\b).{{0,600}}\\b(?<=\\w)", RegexOptions.IgnoreCase | RegexOptions.Compiled | RegexOptions.ExplicitCapture);
+                    previewFinder = new Regex($"\\b\\w(?=.{{0,300}}\\b({String.Join("|", words)})\\b).{{0,1000}}\\b(?<=\\w)", RegexOptions.IgnoreCase | RegexOptions.Compiled | RegexOptions.ExplicitCapture | RegexOptions.Singleline);
+                    previewBolder = new Regex($"\\b({String.Join("|", words)})\\b", RegexOptions.Compiled | RegexOptions.IgnoreCase);
                     time = (DateTime.UtcNow - start).TotalSeconds;
                     // Update the session state.
                     Session["time"] = time;
                     Session["results"] = resultList;
                     Session["page"] = 0;
                     Session["previewFinder"] = previewFinder;
+                    Session["previewBolder"] = previewBolder;
                 } catch (Exception err) {
                     results.Controls.Add(new HtmlGenericControl("p") { InnerText = $"Oops! Something went wrong! Please try again later. {err.Message}" });
                     return;
@@ -141,6 +144,7 @@ namespace AskMe_Web_UI {
                 // Retrieve the session state.
                 try {
                     previewFinder = (Regex)Session["previewFinder"];
+                    previewBolder = (Regex)Session["previewBolder"];
                     resultList = (List<PageEntry>)Session["results"];
                     time = (double)Session["time"];
                     page = (int)Session["page"];
@@ -181,7 +185,7 @@ namespace AskMe_Web_UI {
                         Match previewMatch = previewFinder.Match(resultList[i].contents);
                         if (previewMatch.Captures.Count > 0) {
                             HtmlGenericControl previewElement = new HtmlGenericControl("dd");
-                            previewElement.InnerText = previewMatch.Value;
+                            previewElement.InnerHtml = previewBolder.Replace(HttpUtility.HtmlEncode(previewMatch.Value), "<b>$1</b>");
                             previewElement.Attributes["class"] = "preview";
                             container.Controls.Add(previewElement);
                         }
