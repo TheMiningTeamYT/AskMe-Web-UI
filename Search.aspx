@@ -15,7 +15,7 @@
 </asp:Content>
 <asp:Content ID="Content2" ContentPlaceHolderID="body" runat="server">
     <form id="query" action="/Search.aspx" method="get">
-        <input class="searchBar" type="text" name="q"/>
+        <input class="searchBar" type="text" name="q" id="search"/>
         <input type="submit" value="Search!" />
     </form>
     <asp:Panel ID="results" runat="server"></asp:Panel>

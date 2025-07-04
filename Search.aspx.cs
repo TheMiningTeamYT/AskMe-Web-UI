@@ -28,6 +28,13 @@ namespace AskMe_Web_UI {
                 return;
             }
 
+            // Put the search query into the search bar.
+            ClientScriptManager cs = Page.ClientScript;
+            Type csType = this.GetType();
+            if (!cs.IsStartupScriptRegistered(csType, "searchBoxFixer")) {
+                cs.RegisterStartupScript(csType, "searchBoxFixer", $"<script type=\"text/javascript\">document.getElementById(\"search\").value = \"{search.Replace("\"", "\\\"")}\";</script>");
+            }
+
             // Clean and split the query.
             char[] delimiters = { ' ' };
             string[] words = cleaner.Replace(search, " ").ToLower().Split(delimiters, StringSplitOptions.RemoveEmptyEntries);
@@ -185,13 +192,13 @@ namespace AskMe_Web_UI {
                         Match previewMatch = previewFinder.Match(resultList[i].contents);
                         if (previewMatch.Captures.Count > 0) {
                             HtmlGenericControl previewElement = new HtmlGenericControl("dd");
-                            previewElement.InnerHtml = previewBolder.Replace(HttpUtility.HtmlEncode(previewMatch.Value), "<b>$1</b>");
+                            previewElement.InnerHtml = previewBolder.Replace(HttpUtility.HtmlEncode(previewMatch.Value), "<strong>$1</strong>");
                             previewElement.Attributes["class"] = "preview";
                             container.Controls.Add(previewElement);
                         }
                     } catch (Exception err) { }
                     HtmlGenericControl pageLoc = new HtmlGenericControl("dd");
-                    pageLoc.Controls.Add(new HtmlGenericControl("i") {InnerText = Uri.UnescapeDataString(resultList[i].url)});
+                    pageLoc.Controls.Add(new HtmlGenericControl("em") {InnerText = Uri.UnescapeDataString(resultList[i].url)});
                     pageLoc.Attributes["class"] = "location";
                     container.Controls.Add(pageLoc);
                     results.Controls.Add(container);
