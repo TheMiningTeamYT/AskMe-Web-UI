@@ -14,10 +14,7 @@
     </style>
 </asp:Content>
 <asp:Content ID="Content2" ContentPlaceHolderID="body" runat="server">
-    <form id="query" action="/Search.aspx" method="get">
-        <input class="searchBar" type="text" name="q" id="search"/>
-        <input type="submit" value="Search!" />
-    </form>
+    <asp:Panel ID="searchBox" runat="server"></asp:Panel>
     <asp:Panel ID="results" runat="server"></asp:Panel>
     <form id="posControls" runat="server">
         <asp:Button ID="back" runat="server" Visible="False" Text="Back"/>

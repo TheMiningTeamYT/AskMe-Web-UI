@@ -21,18 +21,29 @@ namespace AskMe_Web_UI {
             double time = 0;
             List<PageEntry> resultList;
             int page = 0;
+            {
+                HtmlGenericControl query = new HtmlGenericControl("form");
+                query.Attributes["action"] = "/Search.aspx";
+                query.Attributes["method"] = "get";
+                HtmlGenericControl searchBar = new HtmlGenericControl("input");
+                searchBar.Attributes["type"] = "text";
+                searchBar.Attributes["class"] = "searchBar";
+                searchBar.Attributes["name"] = "q";
+                searchBar.Attributes["value"] = search;
+                query.Controls.Add(searchBar);
+                HtmlGenericControl submitButton = new HtmlGenericControl("input");
+                submitButton.Attributes["type"] = "submit";
+                submitButton.Attributes["class"] = "submitButton";
+                submitButton.Attributes["value"] = "Search!";
+                query.Controls.Add(submitButton);
+                searchBox.Controls.Add(query);
+
+            }
             if (search == null) {
                 results.Controls.Add(new HtmlGenericControl("p") {InnerText = "Enter a search query to get started!"});
                 next.Visible = false;
                 back.Visible = false;
                 return;
-            }
-
-            // Put the search query into the search bar.
-            ClientScriptManager cs = Page.ClientScript;
-            Type csType = this.GetType();
-            if (!cs.IsStartupScriptRegistered(csType, "searchBoxFixer")) {
-                cs.RegisterStartupScript(csType, "searchBoxFixer", $"<script type=\"text/javascript\">document.getElementById(\"search\").value = \"{search.Replace("\"", "\\\"")}\";</script>");
             }
 
             // Clean and split the query.
