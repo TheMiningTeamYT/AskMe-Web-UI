@@ -165,7 +165,7 @@ namespace AskMe_Web_UI {
             }
             try {
                 HtmlGenericControl stats = new HtmlGenericControl("p");
-                stats.InnerText = $"Found {resultList.Count} results in {time:0.###} seconds.";
+                stats.InnerText = $"Found {resultList.Count} results for \"{search}\" in {time:0.###} seconds.";
                 stats.Attributes["class"] = "stats";
                 results.Controls.Add(stats);
                 title.InnerText = "AskMe: " + search;
