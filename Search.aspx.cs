@@ -14,7 +14,9 @@ using Newtonsoft.Json;
 
 namespace AskMe_Web_UI {
     public partial class Search : System.Web.UI.Page {
-        private static Regex cleaner = new Regex(@"[^a-z0-9' ]", RegexOptions.Compiled | RegexOptions.IgnoreCase);
+        private static Regex cleaner = new Regex($"[^a-z0-9']", RegexOptions.Compiled | RegexOptions.IgnoreCase | RegexOptions.ExplicitCapture);
+        private static Regex filterFinder = new Regex(@"\s(site):(\S+)", RegexOptions.Compiled | RegexOptions.IgnoreCase);
+        private static Regex fallbackPreviewFinder = new Regex(@"\b\w.{0,1000}\b(?<=\w)", RegexOptions.Compiled | RegexOptions.IgnoreCase);
         protected void Page_Load(object sender, EventArgs e) {
             DateTime start = DateTime.UtcNow;
             string search = Request.QueryString["q"];
@@ -45,6 +47,10 @@ namespace AskMe_Web_UI {
                 back.Visible = false;
                 return;
             }
+
+            // Look for filters in the query.
+            MatchCollection filters = filterFinder.Matches(search);
+            search = filterFinder.Replace(search, "");
 
             // Clean and split the query.
             char[] delimiters = { ' ' };
@@ -80,12 +86,24 @@ namespace AskMe_Web_UI {
                 try {
                     for (int i = 0; i < words.Length; i++) {
                         matchingPages = new DataSet();
+                        foreach (Match filter in filters) {
+                            switch (filter.Groups[1].Value) {
+                                case "site":
+                                    adapter = new SqlDataAdapter {
+                                        SelectCommand = new SqlCommand($"SELECT word, neighbors, pageID FROM PageIndex WHERE word = '{words[i].Replace("'", "''")}' AND domain = '{filter.Groups[2].Value.Replace("'", "''")}';", dbConn)
+                                    };
+                                    goto adapterFill;
+                                default:
+                                    break;
+                            }
+                        }
                         adapter = new SqlDataAdapter {
                             SelectCommand = new SqlCommand($"SELECT word, neighbors, pageID FROM PageIndex WHERE word = '{words[i].Replace("'", "''")}';", dbConn)
                         };
+                    adapterFill:
                         adapter.Fill(matchingPages);
 
-                        // Score each page.
+                        // Score each page's relevance.
                         foreach (DataRow row in matchingPages.Tables[0].Rows) {
                             Int64 pageID = (Int64)row["pageID"];
                             HashSet<string> neighbors = JsonConvert.DeserializeObject<HashSet<string>>((string)row["neighbors"]);
@@ -97,16 +115,16 @@ namespace AskMe_Web_UI {
                             }
                             pageScores[pageID].matches += 1;
                             if (words.Length == 1) {
-                                pageScores[pageID].score += 1;
+                                pageScores[pageID].score += words[i].Length/2 + 1;
                             } else {
-                                pageScores[pageID].score += words.Length - 1;
+                                pageScores[pageID].score += (words.Length - 1)*(words[i].Length/2 + 1);
                                 for (int j = 0; j < words.Length; j++) {
                                     if (j != i && neighbors.Contains(words[j])) {
                                         int distance = Math.Abs(i - j);
                                         if (distance == 1) {
-                                            pageScores[pageID].score += words.Length;
+                                            pageScores[pageID].score += words.Length*(words[j].Length/2 + 1);
                                         } else {
-                                            pageScores[pageID].score += words.Length - distance;
+                                            pageScores[pageID].score += (words.Length - distance)*(words[j].Length / 2 + 1);
                                         }
                                     }
                                 }
@@ -141,7 +159,7 @@ namespace AskMe_Web_UI {
                 try {
                     foreach (DataRow row in matchingPages.Tables[0].Rows) {
                         Int64 pageID = (Int64)row["ID"];
-                        resultList.Add(new PageEntry { url = (string)row["url"], title = (string)row["title"], contents = (HttpUtility.HtmlDecode((string)row["contents"])).Replace('\r', ' ').Replace('\n', ' '), popularity = ((int)row["clicks"] / float.Parse(WebConfigurationManager.AppSettings["clickWeight"]) + 1.0f) * pageScores[pageID].score });
+                        resultList.Add(new PageEntry { url = (string)row["url"], title = (string)row["title"], contents = (HttpUtility.HtmlDecode((string)row["contents"])).Replace('\r', ' ').Replace('\n', ' '), score = ((int)row["clicks"] / float.Parse(WebConfigurationManager.AppSettings["clickWeight"]) + 1.0f) * pageScores[pageID].score });
                     }
                     resultList.Sort();
                     // I think this is safe?
@@ -183,7 +201,7 @@ namespace AskMe_Web_UI {
             }
             try {
                 HtmlGenericControl stats = new HtmlGenericControl("p");
-                stats.InnerText = $"Found {resultList.Count} results for \"{search}\" in {time:0.###} seconds.";
+                stats.InnerText = $"Found {resultList.Count} results for '{search}' in {time:0.###} seconds.";
                 stats.Attributes["class"] = "stats";
                 results.Controls.Add(stats);
                 title.InnerText = "AskMe: " + search;
@@ -192,7 +210,7 @@ namespace AskMe_Web_UI {
                     HtmlGenericControl container = new HtmlGenericControl("dl");
                     HtmlGenericControl pageName = new HtmlGenericControl("dt");
                     HtmlGenericControl link = new HtmlGenericControl("a");
-                    link.InnerText = resultList[i].title;
+                    link.InnerText = HttpUtility.HtmlDecode(resultList[i].title);
                     link.Attributes["href"] = $"/Go.aspx?next={Uri.EscapeDataString(resultList[i].url)}";
                     pageName.Controls.Add(link);
                     container.Controls.Add(pageName);
@@ -201,9 +219,18 @@ namespace AskMe_Web_UI {
                     // I think this is safe?
                     try {
                         Match previewMatch = previewFinder.Match(resultList[i].contents);
-                        if (previewMatch.Captures.Count > 0) {
+                        string preview = null;
+                        if (previewMatch.Success) {
+                            preview = previewMatch.Value;
+                        } else {
+                            previewMatch = fallbackPreviewFinder.Match(resultList[i].contents);
+                            if (previewMatch.Success) {
+                                preview = previewMatch.Value;
+                            }
+                        }
+                        if (preview != null) {
                             HtmlGenericControl previewElement = new HtmlGenericControl("dd");
-                            previewElement.InnerHtml = previewBolder.Replace(HttpUtility.HtmlEncode(previewMatch.Value), "<strong>$1</strong>");
+                            previewElement.InnerHtml = previewBolder.Replace(HttpUtility.HtmlEncode(preview), "<strong>$1</strong>");
                             previewElement.Attributes["class"] = "preview";
                             container.Controls.Add(previewElement);
                         }
@@ -249,13 +276,13 @@ namespace AskMe_Web_UI {
         public string url;
         public string title;
         public string contents;
-        public float popularity;
+        public float score;
         public PageEntry() { }
         public int CompareTo(PageEntry other) {
-            if (other.popularity > popularity) {
+            if (other.score > score) {
                 return 1;
             }
-            if (other.popularity < popularity) {
+            if (other.score < score) {
                 return -1;
             }
             return 0;
