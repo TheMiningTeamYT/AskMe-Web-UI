@@ -49,6 +49,7 @@ namespace AskMe_Web_UI {
                     return;
                 }
                 ((HashSet<string>)Session["lastPages"]).Add(page);
+                Response.Cache.SetNoStore();
                 Response.Redirect(page, false);
             } catch (Exception err) {
                 message.InnerText = $"Oops! Something went wrong. Please try again later. {err.Message}";
