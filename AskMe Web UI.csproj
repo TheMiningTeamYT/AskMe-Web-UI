@@ -74,6 +74,7 @@
   <ItemGroup>
     <Content Include="Go.aspx" />
     <Content Include="index.html" />
+    <Content Include="Lucky.aspx" />
     <Content Include="MasterPages\AskMe.Master" />
     <None Include="packages.config" />
     <None Include="Web.Debug.config">
@@ -96,6 +97,13 @@
     </Compile>
     <Compile Include="Go.aspx.designer.cs">
       <DependentUpon>Go.aspx</DependentUpon>
+    </Compile>
+    <Compile Include="Lucky.aspx.cs">
+      <DependentUpon>Lucky.aspx</DependentUpon>
+      <SubType>ASPXCodeBehind</SubType>
+    </Compile>
+    <Compile Include="Lucky.aspx.designer.cs">
+      <DependentUpon>Lucky.aspx</DependentUpon>
     </Compile>
     <Compile Include="MasterPages\AskMe.Master.cs">
       <DependentUpon>AskMe.Master</DependentUpon>
