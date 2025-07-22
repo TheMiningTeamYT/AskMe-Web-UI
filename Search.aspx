@@ -7,6 +7,8 @@
         }
         .location {
             font-size: 12px;
+            font-style: italic;
+            color: gray;
         }
         .preview {
             font-size: 12px;

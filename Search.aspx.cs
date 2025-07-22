@@ -230,13 +230,13 @@ namespace AskMe_Web_UI {
                         }
                         if (preview != null) {
                             HtmlGenericControl previewElement = new HtmlGenericControl("dd");
-                            previewElement.InnerHtml = previewBolder.Replace(HttpUtility.HtmlEncode(preview), "<strong>$1</strong>");
+                            previewElement.InnerHtml = previewBolder.Replace(HttpUtility.HtmlEncode(preview), "<b>$1</b>");
                             previewElement.Attributes["class"] = "preview";
                             container.Controls.Add(previewElement);
                         }
                     } catch (Exception err) { }
                     HtmlGenericControl pageLoc = new HtmlGenericControl("dd");
-                    pageLoc.Controls.Add(new HtmlGenericControl("em") {InnerText = Uri.UnescapeDataString(resultList[i].url)});
+                    pageLoc.Controls.Add(new HtmlGenericControl("em") { InnerText = Uri.UnescapeDataString(resultList[i].url) });
                     pageLoc.Attributes["class"] = "location";
                     container.Controls.Add(pageLoc);
                     results.Controls.Add(container);

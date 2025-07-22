@@ -30,7 +30,6 @@ namespace AskMe_Web_UI {
                 return;
             }
             // Parse the URL from the query string.
-            next = Uri.EscapeUriString(Uri.UnescapeDataString(next));
             try {
                 // Update the database.
                 bool success;
