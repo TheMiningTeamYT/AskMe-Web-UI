@@ -14,8 +14,8 @@ using Newtonsoft.Json;
 
 namespace AskMe_Web_UI {
     public partial class Search : System.Web.UI.Page {
-        private static Regex cleaner = new Regex($"[^a-z0-9']", RegexOptions.Compiled | RegexOptions.IgnoreCase | RegexOptions.ExplicitCapture);
-        private static Regex filterFinder = new Regex(@"\s(site):(\S+)", RegexOptions.Compiled | RegexOptions.IgnoreCase);
+        private static Regex wordFinder = new Regex(@"""""|(""(?<quote>((?<quoteword>[a-z0-9']+)[^a-z0-9'""]*)+)"")|(?<word>\b[a-z0-9']+)", RegexOptions.IgnoreCase | RegexOptions.ExplicitCapture);
+        private static Regex filterFinder = new Regex(@"\s(site):(\S+)", RegexOptions.IgnoreCase);
         private static Regex fallbackPreviewFinder = new Regex(@"\b\w.{0,1000}\b(?<=\w)", RegexOptions.Compiled | RegexOptions.IgnoreCase);
         protected void Page_Load(object sender, EventArgs e) {
             DateTime start = DateTime.UtcNow;
@@ -48,24 +48,41 @@ namespace AskMe_Web_UI {
                 return;
             }
 
-            // Look for filters in the query.
-            MatchCollection filters = filterFinder.Matches(search);
-            search = filterFinder.Replace(search, "");
-
-            // Clean and split the query.
-            char[] delimiters = { ' ' };
-            string[] words = cleaner.Replace(search, " ").ToLower().Split(delimiters, StringSplitOptions.RemoveEmptyEntries);
-            if (words.Length == 0) {
-                results.Controls.Add(new HtmlGenericControl("p") { InnerText = "Enter a search query to get started!" });
-                next.Visible = false;
-                back.Visible = false;
-                return;
-            }
-
             Regex previewFinder;
             Regex previewBolder;
 
             if (Session["page"] == null || !IsPostBack) {
+                // Look for filters in the query.
+                MatchCollection filters = filterFinder.Matches(search);
+                search = filterFinder.Replace(search, "");
+
+                // Clean and split the query.
+                MatchCollection words = wordFinder.Matches(search.ToLower());
+                if (words.Count == 0) {
+                    results.Controls.Add(new HtmlGenericControl("p") { InnerText = "Enter a search query to get started!" });
+                    next.Visible = false;
+                    back.Visible = false;
+                    return;
+                }
+
+                List<Token> tokens = new List<Token>();
+                int numQuoteWords = 0;
+                List<string> quotes = new List<string>();
+                foreach (Match wordMatch in words) {
+                    if (wordMatch.Groups["word"].Captures.Count > 0) {
+                        tokens.Add(new Token { value = wordMatch.Groups["word"].Value, quote = -1, flags = 0 });
+                        continue;
+                    }
+                    if (wordMatch.Groups["quote"].Captures.Count > 0) {
+                        foreach (Capture word in wordMatch.Groups["quoteword"].Captures) {
+                            tokens.Add(new Token { value = word.Value, quote = quotes.Count, flags = 0 }); ;
+                            numQuoteWords++;
+                        }
+                        quotes.Add(wordMatch.Groups["quote"].Value);
+                        continue;
+                    }
+                }
+
                 // Connect to the DB.
                 SqlConnection dbConn;
                 try {
@@ -84,23 +101,21 @@ namespace AskMe_Web_UI {
                 DataSet matchingPages;
                 SqlDataAdapter adapter;
                 try {
-                    for (int i = 0; i < words.Length; i++) {
-                        matchingPages = new DataSet();
-                        foreach (Match filter in filters) {
-                            switch (filter.Groups[1].Value) {
-                                case "site":
-                                    adapter = new SqlDataAdapter {
-                                        SelectCommand = new SqlCommand($"SELECT word, neighbors, pageID FROM PageIndex WHERE word = '{words[i].Replace("'", "''")}' AND domain = '{filter.Groups[2].Value.Replace("'", "''")}';", dbConn)
-                                    };
-                                    goto adapterFill;
-                                default:
-                                    break;
-                            }
+                    string qualifiers = "";
+                    foreach (Match filter in filters) {
+                        switch (filter.Groups[1].Value) {
+                            case "site":
+                                qualifiers += $" AND domain = '{filter.Groups[2].Value.Replace("'", "''")}'";
+                                break;
+                            default:
+                                break;
                         }
+                    }
+                    for (int i = 0; i < tokens.Count; i++) {
+                        matchingPages = new DataSet();
                         adapter = new SqlDataAdapter {
-                            SelectCommand = new SqlCommand($"SELECT word, neighbors, pageID FROM PageIndex WHERE word = '{words[i].Replace("'", "''")}';", dbConn)
+                            SelectCommand = new SqlCommand($"SELECT word, neighbors, pageID FROM PageIndex WHERE word = '{tokens[i].value.Replace("'", "''")}'{qualifiers};", dbConn)
                         };
-                    adapterFill:
                         adapter.Fill(matchingPages);
 
                         // Score each page's relevance.
@@ -110,21 +125,34 @@ namespace AskMe_Web_UI {
                             if (!pageScores.ContainsKey(pageID)) {
                                 pageScores[pageID] = new PageScore {
                                     matches = 0,
+                                    quoteWordsMatched = 0,
                                     score = 0
                                 };
+                            } else if (pageScores[pageID].quoteWordsMatched == -1) {
+                                continue;
                             }
-                            pageScores[pageID].matches += 1;
-                            if (words.Length == 1) {
-                                pageScores[pageID].score += words[i].Length/2 + 1;
+                            pageScores[pageID].matches++;
+                            if (tokens[i].quote != -1) {
+                                pageScores[pageID].quoteWordsMatched++;
+                            }
+                            if (tokens.Count == 1) {
+                                pageScores[pageID].score += tokens[i].value.Length/2 + 1;
                             } else {
-                                pageScores[pageID].score += (words.Length - 1)*(words[i].Length/2 + 1);
-                                for (int j = 0; j < words.Length; j++) {
-                                    if (j != i && neighbors.Contains(words[j])) {
+                                pageScores[pageID].score += (tokens.Count - 1)*(tokens[i].value.Length/2 + 1);
+                                for (int j = 0; j < tokens.Count; j++) {
+                                    if (j != i) {
                                         int distance = Math.Abs(i - j);
-                                        if (distance == 1) {
-                                            pageScores[pageID].score += words.Length*(words[j].Length/2 + 1);
-                                        } else {
-                                            pageScores[pageID].score += (words.Length - distance)*(words[j].Length / 2 + 1);
+                                        if (neighbors.Contains(tokens[j].value)) {
+                                            if (distance == 1) {
+                                                pageScores[pageID].score += tokens.Count * (tokens[j].value.Length / 2 + 1);
+                                            } else {
+                                                pageScores[pageID].score += (tokens.Count - distance) * (tokens[j].value.Length / 2 + 1);
+                                            }
+                                            // If this token is part of a required quote, and the words around it in the query are part of the same quote,
+                                            // check that those words are in the list of neighbors.
+                                        } else if (tokens[i].quote != -1 && tokens[j].quote == tokens[i].quote && distance < 3) {
+                                            pageScores[pageID].quoteWordsMatched = -1;
+                                            break;
                                         }
                                     }
                                 }
@@ -133,7 +161,7 @@ namespace AskMe_Web_UI {
                     }
 
                     // Filter the page score dictionary for pages with at least (words.length / 2) matches
-                    pageScores = pageScores.Where(i => i.Value.matches >= (words.Length / 2)).ToDictionary(i => i.Key, i => i.Value);
+                    pageScores = pageScores.Where(i => i.Value.matches >= (tokens.Count / 2) && i.Value.quoteWordsMatched == numQuoteWords).ToDictionary(i => i.Key, i => i.Value);
 
                     // If we didn't find any results, return.
                     if (pageScores.Keys.Count == 0) {
@@ -159,12 +187,34 @@ namespace AskMe_Web_UI {
                 try {
                     foreach (DataRow row in matchingPages.Tables[0].Rows) {
                         Int64 pageID = (Int64)row["ID"];
-                        resultList.Add(new PageEntry { url = (string)row["url"], title = (string)row["title"], contents = (HttpUtility.HtmlDecode((string)row["contents"])).Replace('\r', ' ').Replace('\n', ' '), score = ((int)row["clicks"] / float.Parse(WebConfigurationManager.AppSettings["clickWeight"]) + 1.0f) * pageScores[pageID].score });
+                        string pageContents = (string)row["contents"];
+                        bool matches = true;
+                        if (quotes.Count != 0) {
+                            foreach(string quote in quotes) {
+                                if (!pageContents.ToLower().Contains(quote)) {
+                                    matches = false;
+                                    break;
+                                }
+                            }
+                        }
+                        if (matches) {
+                            resultList.Add(new PageEntry { url = (string)row["url"], title = (string)row["title"], contents = (HttpUtility.HtmlDecode((string)row["contents"])).Replace('\r', ' ').Replace('\n', ' '), score = ((int)row["clicks"] / float.Parse(WebConfigurationManager.AppSettings["clickWeight"]) + 1.0f) * pageScores[pageID].score });
+                        }
+                    }
+                    // If we didn't find any results, return.
+                    if (resultList.Count == 0) {
+                        results.Controls.Add(new HtmlGenericControl("p") { InnerText = "Sorry, your search didn't return any results." });
+                        return;
                     }
                     resultList.Sort();
                     // I think this is safe?
-                    previewFinder = new Regex($"\\b\\w(?=.{{0,300}}\\b({String.Join("|", words)})\\b).{{0,1000}}\\b(?<=\\w)", RegexOptions.IgnoreCase | RegexOptions.Compiled | RegexOptions.ExplicitCapture | RegexOptions.Singleline);
-                    previewBolder = new Regex($"\\b({String.Join("|", words)})\\b", RegexOptions.Compiled | RegexOptions.IgnoreCase);
+                    List<string> wordList = new List<string>();
+                    foreach(Token word in tokens) {
+                        wordList.Add(word.value);
+                    }
+                    string wordString = String.Join("|", wordList);
+                    previewFinder = new Regex($"\\b\\w(?=.{{0,300}}\\b({wordString})\\b).{{0,1000}}\\b(?<=\\w)", RegexOptions.IgnoreCase | RegexOptions.Compiled | RegexOptions.ExplicitCapture | RegexOptions.Singleline);
+                    previewBolder = new Regex($"\\b({wordString})\\b", RegexOptions.Compiled | RegexOptions.IgnoreCase);
                     time = (DateTime.UtcNow - start).TotalSeconds;
                     // Update the session state.
                     Session["time"] = time;
@@ -270,7 +320,15 @@ namespace AskMe_Web_UI {
     }
     public class PageScore {
         public int matches;
+        public int quoteWordsMatched;
         public int score;
+    }
+    public enum TokenFlags {
+    }
+    public class Token {
+        public string value;
+        public int quote;
+        public TokenFlags flags;
     }
     public class PageEntry : IComparable<PageEntry> {
         public string url;
